@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IPA Exam – Teacher Dashboard</title>
+<script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>:root{--ink:#17324d;--pri:#1f6f95;--ok:#2eaa5a;--line:#d6e2ec}*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;background:#f1f6fa;color:var(--ink)}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}button,input{font:inherit;border-radius:8px;padding:8px 14px;border:2px solid var(--line)}button{background:var(--pri);color:#fff;border:0;font-weight:600;cursor:pointer}button.alt{background:#fff;color:var(--pri);border:2px solid var(--pri)}
+.hide{display:none!important}#lg{max-width:380px;margin:60px auto;text-align:center}#lg input{width:100%;margin:6px 0}
+header{background:var(--pri);color:#fff;padding:10px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}header h1{font-size:18px;margin:0;flex:1}
+#st{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px}#st div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}#st b{display:block;font-size:26px;color:var(--pri)}
+.w{margin:0 14px 14px;overflow:auto}table{width:100%;border-collapse:collapse;min-width:900px}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{background:#e8f1f7}
+.pb{width:90px;height:9px;background:#e3e9ee;border-radius:6px;display:inline-block;vertical-align:middle;overflow:hidden}.pb i{display:block;height:100%;background:var(--ok)}
+.c{display:inline-block;min-width:24px;text-align:center;border-radius:6px;font-weight:700;padding:0 6px;margin-right:3px;background:#eee;color:#999}.y.on{background:#ffd33d;color:#442}.o.on{background:#ff9a1f;color:#442}.r.on{background:#e53935;color:#fff}
+tr.red{background:#fdeaea}tr.off td:first-child:after{content:' (disconnected)';color:#c62828;font-size:12px}.tag{border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700}.running{background:#e1f0ff;color:#0b5cad}.done{background:#e1f6e8;color:#1b7a3d}</style></head><body>
+<section id="lg" class="card"><h2>Teacher login</h2><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><p id="er" style="color:#c62828"></p><button id="in" style="width:100%">Log in</button></section>
+<section id="app" class="hide"><header><h1>IPA Maths Olympiad – Live Dashboard</h1><input id="q" placeholder="Search name / place / class"><button class="alt" id="ex">Export CSV</button><button class="alt" id="out">Log out</button></header>
+<div id="st"></div><div class="w card"><table><thead><tr><th>Student</th><th>Class</th><th>Place</th><th>Status</th><th>Progress</th><th>Time left</th><th>Alerts (Y/O/R)</th><th>Score /45</th><th>Last seen</th></tr></thead><tbody id="tb"></tbody></table></div></section>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sb=(window.CFG&&!CFG.URL.includes('PASTE'))?supabase.createClient(CFG.URL,CFG.KEY):null;let D=[],ch;
+const mmss=s=>String(s/60|0).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+$('in').onclick=async()=>{if(!sb){$('er').textContent='Set Supabase URL/key in config.js';return}
+ const{error}=await sb.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});if(error){$('er').textContent=error.message;return}
+ const{data}=await sb.rpc('is_admin');if(!data){$('er').textContent='This account is not a teacher/admin.';await sb.auth.signOut();return}start()};
+$('out').onclick=async()=>{await sb.auth.signOut();location.reload()};
+async function start(){$('lg').classList.add('hide');$('app').classList.remove('hide');await load();
+ ch=sb.channel('live').on('postgres_changes',{event:'*',schema:'public',table:'attempts'},load).subscribe();setInterval(load,15000);setInterval(render,1000)}
+async function load(){const{data}=await sb.from('attempts').select('id,name,std,place,started_at,last_seen,status,answered,warn_y,warn_o,warn_r,score,finished_at').order('started_at',{ascending:false});if(data){D=data;render()}}
+function rows(){const q=$('q').value.toLowerCase();return D.filter(r=>(r.name+' '+r.place+' '+r.std).toLowerCase().includes(q))}
+function render(){const now=Date.now(),R=rows(),run=D.filter(r=>r.status=='running'),dn=D.filter(r=>r.status=='done');
+ $('st').innerHTML=[['Students',D.length],['Running',run.length],['Finished',dn.length],['Red alerts',D.filter(r=>r.warn_r>0).length],['Avg score',dn.length?(dn.reduce((a,r)=>a+r.score,0)/dn.length).toFixed(1):'–']].map(x=>`<div><b>${x[1]}</b>${x[0]}</div>`).join('');
+ $('tb').innerHTML=R.map(r=>{const left=Math.max(0,3600-Math.round((now-new Date(r.started_at))/1000)),seen=Math.round((now-new Date(r.last_seen))/1000),off=r.status=='running'&&seen>30;
+ return`<tr class="${r.warn_r>0?'red':''} ${off?'off':''}"><td><b>${esc(r.name)}</b></td><td>${esc(r.std)}</td><td>${esc(r.place)}</td><td><span class="tag ${r.status}">${r.status}</span></td><td><span class="pb"><i style="width:${r.answered/35*100}%"></i></span> ${r.answered}/35</td><td>${r.status=='running'?mmss(left):'–'}</td><td><span class="c y ${r.warn_y?'on':''}">${r.warn_y}</span><span class="c o ${r.warn_o?'on':''}">${r.warn_o}</span><span class="c r ${r.warn_r?'on':''}">${r.warn_r}</span></td><td>${r.score??'–'}</td><td>${r.status=='running'?(seen<60?seen+'s ago':Math.round(seen/60)+' min ago'):'–'}</td></tr>`}).join('')||'<tr><td colspan=9>No students yet.</td></tr>'}
+$('q').oninput=render;
+$('ex').onclick=()=>{const h=['Name','Class','Place','Status','Answered','Score','Yellow','Orange','Red','Started','Finished'],f=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const csv=[h.map(f).join(',')].concat(rows().map(r=>[r.name,r.std,r.place,r.status,r.answered,r.score,r.warn_y,r.warn_o,r.warn_r,r.started_at,r.finished_at].map(f).join(','))).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='ipa_results.csv';a.click()};
+(async()=>{if(sb){const{data}=await sb.auth.getSession();if(data.session){const r=await sb.rpc('is_admin');if(r.data)start()}}})();
+</script></body></html>
