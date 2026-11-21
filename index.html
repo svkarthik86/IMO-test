@@ -93,7 +93,7 @@ let S=null,tk,mon,stream,away=0,base=null,hb,st;
 const sb=(window.CFG&&!CFG.URL.includes('PASTE'))?supabase.createClient(CFG.URL,CFG.KEY):null;
 $('logo').src=IMG.iba;$('istd').innerHTML='<option value="">-- Select standard --</option>'+[...Array(12)].map((_,i)=>`<option>Class ${i+1}</option>`).join('');
 const save=()=>{try{localStorage.setItem('cmo',JSON.stringify(S))}catch(e){}sync()};
-const push=()=>{if(sb&&S&&S.id&&!S.fin)return sb.rpc('save_progress',{p_id:S.id,p_answers:S.ans,p_cur:S.cur,p_y:LV()[0],p_o:LV()[1],p_r:LV()[2]})};
+const push=async()=>{if(sb&&S&&S.id&&!S.fin){try{const r=await sb.rpc('save_progress',{p_id:S.id,p_answers:S.ans,p_cur:S.cur,p_y:LV()[0],p_o:LV()[1],p_r:LV()[2]});if(r.error)console.error('save',r.error)}catch(e){console.error('save',e)}}};
 const sync=()=>{clearTimeout(st);st=setTimeout(push,1200)};
 async function connect(){if(!sb){alert('Setup needed: put your Supabase URL and key in config.js');return false}
  try{const a=await sb.auth.signInAnonymously();if(a.error)throw a.error;const{data,error}=await sb.rpc('start_attempt',{p_name:S.name,p_std:S.std,p_place:S.place});if(error)throw error;S.id=data;return true}
