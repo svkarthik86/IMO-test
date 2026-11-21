@@ -97,7 +97,7 @@ const push=()=>{if(sb&&S&&S.id&&!S.fin)return sb.rpc('save_progress',{p_id:S.id,
 const sync=()=>{clearTimeout(st);st=setTimeout(push,1200)};
 async function connect(){if(!sb){alert('Setup needed: put your Supabase URL and key in config.js');return false}
  try{const a=await sb.auth.signInAnonymously();if(a.error)throw a.error;const{data,error}=await sb.rpc('start_attempt',{p_name:S.name,p_std:S.std,p_place:S.place});if(error)throw error;S.id=data;return true}
- catch(e){alert('Cannot connect to the exam server. Check internet and try again.');if(stream)stream.getTracks().forEach(t=>t.stop());return false}}
+ catch(e){alert('Cannot connect to the exam server.\n\nReason: '+((e&&(e.message||e.details))||e)+'\n\nPlease check config.js, the Supabase setup and the internet.');console.error(e);if(stream)stream.getTracks().forEach(t=>t.stop());return false}}
 async function finalize(){for(;;){try{await push();const{data,error}=await sb.rpc('submit_attempt',{p_id:S.id});if(error)throw error;S.key=data.key;return}catch(e){await new Promise(r=>setTimeout(r,3000))}}}
 try{localStorage.removeItem('cmo')}catch(e){}
 const okForm=()=>{const n=$('iname').value.trim(),p=$('iplace').value.trim(),s=$('istd').value;$('err').textContent=n.length<2?'Please enter the student name.':!s?'Please select the standard.':p.length<2?'Please enter the place.':'';return !$('err').textContent};
